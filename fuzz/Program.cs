@@ -174,13 +174,6 @@ namespace fuzz
          return score;
       }
 
-      public static void Usage(string message)
-      {
-         Console.Error.WriteLine(message);
-         Console.Error.WriteLine("fuzz [-l/--limit <limit>] [--] <pattern> [dir...]");
-         Environment.Exit(1);
-      }
-
       struct Args
       {
          public string Pattern;
