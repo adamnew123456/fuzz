@@ -8,14 +8,6 @@ namespace fuzz
    class MainClass
    {
       /// <summary>
-      ///   Returns the minimum of the 3 inputs.
-      /// </summary>
-      private static int Min3(int a, int b, int c)
-      {
-         return Math.Min(a, Math.Min(b, c));
-      }
-
-      /// <summary>
       ///   Recursively explores a directory, and adds all files found within
       ///   to the files set.
       /// </summary>
