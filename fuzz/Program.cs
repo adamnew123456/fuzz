@@ -42,7 +42,7 @@ namespace fuzz
          {
          }
 
-         foreach (string directory in Directory.EnumerateDirectories(path))
+         foreach (string directory in directories)
          {
             string relative_directory = Path.GetFileName(directory);
             if (relative_directory == "." || relative_directory == "..")
@@ -161,7 +161,12 @@ namespace fuzz
          }
       }
 
-      private static int? FuzzyMatchPath(string fuzzypath, string filename)
+      /// <summary>
+      ///   Performs a fuzzy match over a filesystem path, by matching each
+      ///   path component separately and only accepting a filename if all
+      ///   components from the pattern match.
+      /// </summary>
+      private static int? FuzzyMatchPath(string fuzzypath, string filename, bool exact)
       {
          string[] fuzzycomponents = fuzzypath.Split('/', '\\');
          string[] filenamecomponents = filename.Split('/', '\\');
@@ -181,14 +186,51 @@ namespace fuzz
             if (fuzzycomponent.Length == 0)
                continue;
 
-            int? componentScore = FuzzyMatch(filenamecomponent, fuzzycomponent);
-            if (componentScore.HasValue)
+            // None of these make sense as patterns, since they either allow
+            // anything or nothing. Treat these as if they were exact matches.
+            bool useExactMatch = exact ||
+               fuzzycomponent == "^" ||
+               fuzzycomponent == "$" ||
+               fuzzycomponent == "^$";
+
+            bool startAnchor = !useExactMatch && fuzzycomponent.StartsWith("^");
+            bool endAnchor = !useExactMatch && fuzzycomponent.EndsWith("$");
+
+            if (startAnchor && endAnchor)
             {
-               score += componentScore.Value;
+               string match = fuzzycomponent.Substring(1, fuzzycomponent.Length - 2);
+               if (filenamecomponent != match)
+               {
+                  return null;
+               }
+            }
+            else if (startAnchor)
+            {
+               string lead = fuzzycomponent.Substring(1);
+               if (!filenamecomponent.StartsWith(lead))
+               {
+                  return null;
+               }
+            }
+            else if (endAnchor)
+            {
+               string tail = fuzzycomponent.Substring(0, fuzzycomponent.Length - 1);
+               if (!filenamecomponent.EndsWith(tail))
+               {
+                  return null;
+               }
             }
             else
             {
-               return null;
+               int? componentScore = FuzzyMatch(filenamecomponent, fuzzycomponent);
+               if (componentScore.HasValue)
+               {
+                 score += componentScore.Value;
+               }
+               else
+               {
+                 return null;
+               }
             }
          }
 
@@ -200,6 +242,7 @@ namespace fuzz
          public string Pattern;
          public List<string> Paths;
          public int Limit;
+         public bool Exact;
       }
 
       private static Args ParseArgs(string[] args)
@@ -208,6 +251,7 @@ namespace fuzz
          result.Limit = -1;
          result.Pattern = null;
          result.Paths = new List<string>();
+         result.Exact = false;
 
          int i = 0;
          while (i < args.Length)
@@ -240,6 +284,16 @@ namespace fuzz
                   throw new ArgumentException(args[i] + " is not a valid limit");
                }
                i++;
+            }
+            else if (args[i] == "-x" || args[i] == "--exact")
+            {
+               i++;
+               if (result.Exact)
+               {
+                  throw new ArgumentException("Cannot provide duplicate exact flags");
+               }
+
+               result.Exact = true;
             }
             else
             {
@@ -283,7 +337,7 @@ namespace fuzz
          }
          catch (ArgumentException error)
          {
-            Console.Error.WriteLine("fuzz.exe [-l|--limit LIMIT] [--] PATTERN [DIR...]");
+            Console.Error.WriteLine("fuzz.exe [-l|--limit LIMIT] [-x|--exact] [--] PATTERN [DIR...]");
             Console.Error.WriteLine(error.Message);
             return;
          }
@@ -297,7 +351,7 @@ namespace fuzz
          var scores = new Dictionary<string, int>();
          foreach (string filename in Chain(traversers).Distinct())
          {
-            int? score = FuzzyMatchPath(settings.Pattern, filename.ToLower());
+            int? score = FuzzyMatchPath(settings.Pattern, filename.ToLower(), settings.Exact);
             if (score != null)
             {
                scores.Add(filename, score.Value);
