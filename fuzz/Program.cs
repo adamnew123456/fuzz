@@ -8,31 +8,52 @@ namespace fuzz
    class MainClass
    {
       /// <summary>
+      ///   Yields values form each enumerable in sequence, moving from
+      ///   one to the next as each is exhausted.
+      /// </summary>
+      private static IEnumerable<T> Chain<T>(IEnumerable<T>[] enumerables)
+      {
+         foreach (var enumerable in enumerables)
+         {
+            foreach (var value in enumerable)
+            {
+               yield return value;
+            }
+         }
+      }
+
+      /// <summary>
       ///   Recursively explores a directory, and adds all files found within
       ///   to the files set.
       /// </summary>
-      private static void Traverse(string path, ISet<string> files)
+      private static IEnumerable<string> Traverse(string path)
       {
          foreach (string filename in Directory.EnumerateFiles(path))
          {
-            files.Add(filename);
+            yield return filename;
          }
 
+         IEnumerable<string> directories = new string[0];
          try
          {
-            foreach (string directory in Directory.EnumerateDirectories(path))
-            {
-               string relative_directory = Path.GetFileName(directory);
-               if (relative_directory == "." || relative_directory == "..")
-               {
-                  continue;
-               }
-
-               Traverse(directory, files);
-            }
+            directories = Directory.EnumerateDirectories(path);
          }
          catch (UnauthorizedAccessException)
          {
+         }
+
+         foreach (string directory in Directory.EnumerateDirectories(path))
+         {
+            string relative_directory = Path.GetFileName(directory);
+            if (relative_directory == "." || relative_directory == "..")
+            {
+              continue;
+            }
+
+            foreach (var filename in Traverse(directory))
+            {
+              yield return filename;
+            }
          }
       }
 
@@ -267,34 +288,24 @@ namespace fuzz
             return;
          }
 
-         var filenames = new HashSet<string>();
-         foreach (var path in settings.Paths)
+         var traversers = new IEnumerable<string>[settings.Paths.Count];
+         for (int i = 0; i < settings.Paths.Count; i++)
          {
-            Traverse(path, filenames);
+            traversers[i] = Traverse(settings.Paths[i]);
          }
 
-         var to_remove = new Stack<string>();
          var scores = new Dictionary<string, int>();
-         foreach (string filename in filenames)
+         foreach (string filename in Chain(traversers).Distinct())
          {
             int? score = FuzzyMatchPath(settings.Pattern, filename.ToLower());
             if (score != null)
             {
                scores.Add(filename, score.Value);
             }
-            else
-            {
-               to_remove.Push(filename);
-            }
          }
 
-         foreach (string invalid in to_remove)
-         {
-            filenames.Remove(invalid);
-         }
-
-         var best_matches =
-            filenames.OrderBy(sortpath => scores[sortpath])
+         var best_matches = scores.Keys
+            .OrderBy(filename => scores[filename])
             .Take(settings.Limit);
 
          foreach (string match in best_matches)
