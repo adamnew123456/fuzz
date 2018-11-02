@@ -19,7 +19,7 @@ $ fuzz.exe .git/head /home/me/repos
 $ fuzz.exe '.git/HEAD$' /home/me/repos
 
 # The pattern can also include both, to allow only exact matches
-$ fuzz.exe '.git/^HEAD$ /home/me/repos
+$ fuzz.exe '.git/^HEAD$' /home/me/repos
 
 # You can include empty paths, to force a certain number of parent
 # directories, even if you don't care what they are
