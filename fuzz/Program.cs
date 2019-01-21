@@ -28,12 +28,23 @@ namespace fuzz
       /// </summary>
       private static IEnumerable<string> Traverse(string path)
       {
-         foreach (string filename in Directory.EnumerateFiles(path))
+         var empty = new string[0];
+         IEnumerable<string> files = empty;
+
+         try
+         {
+            files = Directory.EnumerateFiles(path);
+         }
+         catch (UnauthorizedAccessException)
+         {
+         }
+
+         foreach (string filename in files )
          {
             yield return filename;
          }
 
-         IEnumerable<string> directories = new string[0];
+         IEnumerable<string> directories = empty;
          try
          {
             directories = Directory.EnumerateDirectories(path);
