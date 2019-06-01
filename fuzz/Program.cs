@@ -280,7 +280,7 @@ namespace fuzz
                }
 
                i++;
-               if (i > args.Length)
+               if (i >= args.Length)
                {
                   throw new ArgumentException("-l / --limit must be followed by a number");
                }
