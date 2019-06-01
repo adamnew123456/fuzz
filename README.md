@@ -28,7 +28,12 @@ $ fuzz.exe //head /home/me/repos
 
 # Building
 
-Run `xbuild` or `msbuild` to compile the solution.
+You can build via the dotnet tool:
+
+```
+# Replace linux-x64 with the appropriate platform
+$ dotnet publish -c release -r linux-x64
+```
 
 # Running
 
